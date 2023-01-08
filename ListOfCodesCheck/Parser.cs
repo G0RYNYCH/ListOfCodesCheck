@@ -2,13 +2,6 @@
 
 public class Parser
 {
-    //private readonly string checkLine;
-
-    //public Parser(string checkLine)
-    //{
-    //    this.checkLine = checkLine;
-    //}
-
     public GroupModel[] ParseCheckLine(string checkLine) => checkLine.Split(',', ';').Select(MapToModel).ToArray();
 
     private GroupModel MapToModel(string parsedStr)

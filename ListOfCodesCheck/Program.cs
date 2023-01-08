@@ -1,8 +1,5 @@
 ﻿using ListOfCodesCheck;
 
-//string filePath = "codes.txt";
-//string checkLine = "1234 - 7, 123 - 5+, 12 - 3, 651";
-
 var filePath = args[0];
 var checkLine = args[1];
 

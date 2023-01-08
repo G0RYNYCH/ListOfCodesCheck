@@ -32,19 +32,19 @@ public class Validator
                 groupCode = span.Slice(0, rule.GroupCode.Length);
             }
 
-            //проверка на наличие группы
+            //group check
             if (!MemoryExtensions.Equals(rule.GroupCode, groupCode, StringComparison.Ordinal))
             {
                 var errorPosition = str.IndexOf(span.ToString()) + 1;
                 return $"Ожидалась группа применения {rule.GroupCode}, найдена {groupCode}. Позиция {errorPosition}.";
             }
 
-            //проверка группы переменной длины
+            //variable length group check
             if (rule.IsLengthVariable)
             {
                 var indexOfSeparator = span.IndexOf(VariableLengthCodeSeparator);
 
-                //проверка на наличие разделителя
+                //separator check
                 if (indexOfSeparator == -1 && i != validationRules.Length - 1)
                 {
                     return $"Не указан символ-разделитель {VariableLengthCodeSeparator}.";
@@ -61,7 +61,7 @@ public class Validator
                     code = span.Slice(rule.GroupCode.Length, indexOfSeparator - rule.GroupCode.Length);
                 }
 
-                // проверка длины группы переменной длины
+                //length check of a variable length group
                 if (code.Length < rule.MinGroupLength)
                 {
                     var errorPosition = str.IndexOf(span.ToString()) + 1;
@@ -90,7 +90,7 @@ public class Validator
                     code = span.Slice(rule.GroupCode.Length, rule.MinGroupLength);
                 }
 
-                // проверка длины группы фиксированного размера
+                //fixed length group check
                 if (code.Length != rule.MinGroupLength)
                 {
                     var errorPosition = str.IndexOf(span.ToString()) + 1;
