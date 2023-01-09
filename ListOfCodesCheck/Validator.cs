@@ -3,108 +3,96 @@
 public class Validator
 {
     const string VariableLengthCodeSeparator = "\\u001d";
-    private readonly ValidationRule[] validationRules;
+
+    private readonly ValidationRule[] _validationRules;
 
     public Validator(ValidationRule[] validationRules)
     {
-        this.validationRules = validationRules;
+        _validationRules = validationRules;
     }
 
     /// <summary>
-    /// Returns string error
+    /// Validates a specified list of groups.
     /// </summary>
+    /// <param name="groupsList">Line of groups from argument file.</param>
+    /// <returns>Null if validation is OK otherwise error message</returns>
     public string Validate(string groupsList)
     {
         var groupsListAsSpan = groupsList.AsSpan();
-        ReadOnlySpan<char> code;
-        string validationErrorMessage;
-
-        for (var currentRuleNumber = 0; currentRuleNumber < validationRules.Length; currentRuleNumber++)
+        
+        for (var currentRuleNumber = 0; currentRuleNumber < _validationRules.Length; currentRuleNumber++)
         {
-            var rule = validationRules[currentRuleNumber];
+            var rule = _validationRules[currentRuleNumber];
 
-            validationErrorMessage = GroupCheck(groupsList, groupsListAsSpan, rule);
-            if (validationErrorMessage != null)
+            var errorMessage = ValidateGroup(groupsList, groupsListAsSpan, rule);
+            if (errorMessage != null)
             {
-                return validationErrorMessage;
+                return errorMessage;
             }
+
+            ReadOnlySpan<char> code;
 
             if (rule.IsLengthVariable)
             {
                 var indexOfSeparator = groupsListAsSpan.IndexOf(VariableLengthCodeSeparator);
 
-                if (indexOfSeparator == -1)
+                code = indexOfSeparator == -1
+                    ? groupsListAsSpan.Slice(rule.GroupCode.Length)
+                    : groupsListAsSpan.Slice(rule.GroupCode.Length, indexOfSeparator - rule.GroupCode.Length);
+
+                errorMessage = ValidateVariableLength(groupsList, code, groupsListAsSpan, rule);
+                if (errorMessage != null)
                 {
-                    code = groupsListAsSpan.Slice(rule.GroupCode.Length);
-                }
-                else
-                {
-                    code = groupsListAsSpan.Slice(rule.GroupCode.Length, indexOfSeparator - rule.GroupCode.Length);
+                    return errorMessage;
                 }
 
-                validationErrorMessage = VariableLengthCheck(groupsList, code, groupsListAsSpan, rule);
-                if (validationErrorMessage != null)
-                {
-                    return validationErrorMessage;
-                }
+                groupsListAsSpan = code.Length == 0 || indexOfSeparator == -1 && currentRuleNumber == _validationRules.Length - 1
+                    ? groupsListAsSpan.Slice(rule.GroupCode.Length)
+                    : groupsListAsSpan.Slice(indexOfSeparator + VariableLengthCodeSeparator.Length);
 
-                if (code.Length == 0 || indexOfSeparator == -1 && currentRuleNumber == validationRules.Length - 1)
+                errorMessage = ValidateVariableCodeContinuation(currentRuleNumber, indexOfSeparator, groupsList, groupsListAsSpan);
+                if (errorMessage != null)
                 {
-                    groupsListAsSpan = groupsListAsSpan.Slice(rule.GroupCode.Length);
-                }
-                else
-                {
-                    groupsListAsSpan = groupsListAsSpan.Slice(indexOfSeparator + VariableLengthCodeSeparator.Length);
-                }
-
-                validationErrorMessage = VariableCodeContinuationCheck(currentRuleNumber, indexOfSeparator, groupsList, groupsListAsSpan);
-                if (validationErrorMessage != null)
-                {
-                    return validationErrorMessage;
+                    return errorMessage;
                 }
 
                 continue;
             }
 
-            if (groupsListAsSpan.Length < rule.GroupCode.Length + rule.MinGroupLength)
-            {
-                code = groupsListAsSpan.Slice(rule.GroupCode.Length);
-            }
-            else
-            {
-                code = groupsListAsSpan.Slice(rule.GroupCode.Length, rule.MinGroupLength);
-            }
+            code = groupsListAsSpan.Length < rule.GroupCode.Length + rule.MinGroupLength
+                ? groupsListAsSpan.Slice(rule.GroupCode.Length)
+                : groupsListAsSpan.Slice(rule.GroupCode.Length, rule.MinGroupLength);
 
-            validationErrorMessage = FixedLengthCheck(groupsList, code, groupsListAsSpan, rule);
-            if (validationErrorMessage != null)
+            errorMessage = ValidateFixedLength(groupsList, code, groupsListAsSpan, rule);
+            if (errorMessage != null)
             {
-                return validationErrorMessage;
+                return errorMessage;
             }
 
             groupsListAsSpan = groupsListAsSpan.Slice(rule.GroupCode.Length + rule.MinGroupLength);
 
-            validationErrorMessage = FixedCodeContinuationCheck(currentRuleNumber, groupsList, groupsListAsSpan, rule);
-            if (validationErrorMessage != null)
+            errorMessage = ValidateFixedCodeContinuation(currentRuleNumber, groupsList, groupsListAsSpan, rule);
+            if (errorMessage != null)
             {
-                return validationErrorMessage;
+                return errorMessage;
             }
         }
 
         return null;
     }
 
-    private string GroupCheck(string groupsList, ReadOnlySpan<char> groupsListAsSpan, ValidationRule rule)
+    /// <summary>
+    /// Checks whether the validation group consists in the line of groups.
+    /// </summary>
+    /// <param name="groupsList">Line of groups from argument file.</param>
+    /// <param name="groupsListAsSpan">Line of groups converted to span.</param>
+    /// <param name="rule">Current rule for validating.</param>
+    /// <returns>Null if validation is OK otherwise error message with expecting group.</returns>
+    private string ValidateGroup(string groupsList, ReadOnlySpan<char> groupsListAsSpan, ValidationRule rule)
     {
-        ReadOnlySpan<char> groupCode;
-
-        if (groupsListAsSpan.Length < rule.GroupCode.Length)
-        {
-            groupCode = groupsListAsSpan.Slice(0);
-        }
-        else
-        {
-            groupCode = groupsListAsSpan.Slice(0, rule.GroupCode.Length);
-        }
+        var groupCode = groupsListAsSpan.Length < rule.GroupCode.Length
+            ? groupsListAsSpan.Slice(0)
+            : groupsListAsSpan.Slice(0, rule.GroupCode.Length);
 
         if (!MemoryExtensions.Equals(rule.GroupCode, groupCode, StringComparison.Ordinal))
         {
@@ -122,7 +110,15 @@ public class Validator
         return null;
     }
 
-    private string VariableLengthCheck(string groupsList, ReadOnlySpan<char> code, ReadOnlySpan<char> groupsListAsSpan, ValidationRule rule)
+    /// <summary>
+    /// Validates the length of variable length group.
+    /// </summary>
+    /// <param name="groupsList">Line of groups from argument file.</param>
+    /// <param name="code">Code that immediately follows the group code.</param>
+    /// <param name="groupsListAsSpan">Line of groups converted to span.</param>
+    /// <param name="rule">Current rule for validating.</param>
+    /// <returns>Null if validation is OK otherwise error message with expecting length.</returns>
+    private string ValidateVariableLength(string groupsList, ReadOnlySpan<char> code, ReadOnlySpan<char> groupsListAsSpan, ValidationRule rule)
     {
         if (code.Length < rule.MinGroupLength)
         {
@@ -135,7 +131,15 @@ public class Validator
         return null;
     }
 
-    private string FixedLengthCheck(string groupsList, ReadOnlySpan<char> code, ReadOnlySpan<char> groupsListAsSpan, ValidationRule rule)
+    /// <summary>
+    /// Validates the length of fixed length group.
+    /// </summary>
+    /// <param name="groupsList">Line of groups from argument file.</param>
+    /// <param name="code">Code that immediately follows the group code.</param>
+    /// <param name="groupsListAsSpan">Line of groups converted to span.</param>
+    /// <param name="rule">Current rule for validating.</param>
+    /// <returns>Null if validation is OK otherwise error message with expecting length.</returns>
+    private string ValidateFixedLength(string groupsList, ReadOnlySpan<char> code, ReadOnlySpan<char> groupsListAsSpan, ValidationRule rule)
     {
         if (code.Length != rule.MinGroupLength)
         {
@@ -148,9 +152,17 @@ public class Validator
         return null;
     }
 
-    private string VariableCodeContinuationCheck(int currentRuleNumber, int indexOfSeparator, string groupsList, ReadOnlySpan<char> groupsListAsSpan)
+    /// <summary>
+    /// Checks whether the variable code continues after its expected completion.
+    /// </summary>
+    /// <param name="currentRuleNumber">Number of current validation rule in a loop.</param>
+    /// <param name="indexOfSeparator">Index of separator character in a line of groups that was converted to span preliminarily.</param>
+    /// <param name="groupsList">Line of groups from argument file.</param>
+    /// <param name="groupsListAsSpan">Line of groups converted to span.</param>
+    /// <returns>Null if validation is OK otherwise error message with unexpected part of the code.</returns>
+    private string ValidateVariableCodeContinuation(int currentRuleNumber, int indexOfSeparator, string groupsList, ReadOnlySpan<char> groupsListAsSpan)
     {
-        if (currentRuleNumber == validationRules.Length - 1 && indexOfSeparator != -1 && !groupsListAsSpan.IsEmpty)
+        if (currentRuleNumber == _validationRules.Length - 1 && indexOfSeparator != -1 && !groupsListAsSpan.IsEmpty)
         {
             var errorPosition = groupsList.Length - groupsListAsSpan.Length + 1;
 
@@ -161,9 +173,17 @@ public class Validator
         return null;
     }
 
-    private string FixedCodeContinuationCheck(int currentRuleNumber, string groupsList, ReadOnlySpan<char> groupsListAsSpan, ValidationRule rule)
+    /// <summary>
+    /// Checks whether the fixed code continues after its expected completion.
+    /// </summary>
+    /// <param name="currentRuleNumber">Number of current validation rule in a loop.</param>
+    /// <param name="groupsList">Line of groups from argument file.</param>
+    /// <param name="groupsListAsSpan">Line of groups converted to span.</param>
+    /// <param name="rule">Current rule for validating.</param>
+    /// <returns>Null if validation is OK otherwise error message with unexpected part of the code.</returns>
+    private string ValidateFixedCodeContinuation(int currentRuleNumber, string groupsList, ReadOnlySpan<char> groupsListAsSpan, ValidationRule rule)
     {
-        if (currentRuleNumber == validationRules.Length - 1 && !groupsListAsSpan.IsEmpty && groupsListAsSpan.Length > rule.MinGroupLength)
+        if (currentRuleNumber == _validationRules.Length - 1 && !groupsListAsSpan.IsEmpty && groupsListAsSpan.Length > rule.MinGroupLength)
         {
             var errorPosition = groupsList.Length - groupsListAsSpan.Length + VariableLengthCodeSeparator.Length + 1;
 

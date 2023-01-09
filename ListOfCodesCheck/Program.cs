@@ -11,14 +11,14 @@ var validator = new Validator(validationRules);
 
 foreach (var groupsList in file)
 {
-    var validationErrorMessage = validator.Validate(groupsList);
+    var errorMessage = validator.Validate(groupsList);
 
-    if (validationErrorMessage == null)
+    if (errorMessage == null)
     {
         checkedFile.WriteLine(groupsList + "\t OK");
     }
     else
     {
-        checkedFile.WriteLine(groupsList + $"\t {validationErrorMessage}");
+        checkedFile.WriteLine(groupsList + $"\t {errorMessage}");
     }
 }
