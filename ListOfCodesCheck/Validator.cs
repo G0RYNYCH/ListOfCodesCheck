@@ -1,120 +1,176 @@
 ﻿namespace ListOfCodesCheck;
 
-/// <summary>
-/// Returns string error
-/// </summary>
 public class Validator
 {
     const string VariableLengthCodeSeparator = "\\u001d";
-    private readonly GroupModel[] validationRules;
+    private readonly ValidationRule[] validationRules;
 
-    public Validator(GroupModel[] validationRules)
+    public Validator(ValidationRule[] validationRules)
     {
         this.validationRules = validationRules;
     }
 
-    public string Validate(string str)
+    /// <summary>
+    /// Returns string error
+    /// </summary>
+    public string Validate(string groupsList)
     {
-        var span = str.AsSpan();
+        var groupsListAsSpan = groupsList.AsSpan();
+        ReadOnlySpan<char> code;
+        string validationErrorMessage;
 
-        for (var i = 0; i < validationRules.Length; i++)
+        for (var currentRuleNumber = 0; currentRuleNumber < validationRules.Length; currentRuleNumber++)
         {
-            var rule = validationRules[i];
+            var rule = validationRules[currentRuleNumber];
 
-            ReadOnlySpan<char> groupCode;
-
-            if (span.Length < rule.GroupCode.Length)
+            validationErrorMessage = GroupCheck(groupsList, groupsListAsSpan, rule);
+            if (validationErrorMessage != null)
             {
-                groupCode = span.Slice(0);
-            }
-            else
-            {
-                groupCode = span.Slice(0, rule.GroupCode.Length);
+                return validationErrorMessage;
             }
 
-            //group check
-            if (!MemoryExtensions.Equals(rule.GroupCode, groupCode, StringComparison.Ordinal))
-            {
-                var errorPosition = str.Length - span.Length + 1;
-                if (groupCode.IsEmpty)
-                {
-                    return $"Ожидалась группа применения {rule.GroupCode}, найдена <конец кода>. Позиция {str.Length + 1}.";
-                }
-                return $"Ожидалась группа применения {rule.GroupCode}, найдена {groupCode}. Позиция {errorPosition}.";
-            }
-
-            //variable length group check
             if (rule.IsLengthVariable)
             {
-                var indexOfSeparator = span.IndexOf(VariableLengthCodeSeparator);
+                var indexOfSeparator = groupsListAsSpan.IndexOf(VariableLengthCodeSeparator);
 
-                //separator check
-                if (indexOfSeparator == -1 && i != validationRules.Length - 1)
-                {
-                    return $"Не указан символ-разделитель {VariableLengthCodeSeparator}.";
-                }
-
-                ReadOnlySpan<char> code;
+                
 
                 if (indexOfSeparator == -1)
                 {
-                    code = span.Slice(rule.GroupCode.Length);
+                    code = groupsListAsSpan.Slice(rule.GroupCode.Length);
                 }
                 else
                 {
-                    code = span.Slice(rule.GroupCode.Length, indexOfSeparator - rule.GroupCode.Length);
+                    code = groupsListAsSpan.Slice(rule.GroupCode.Length, indexOfSeparator - rule.GroupCode.Length);
                 }
 
-                //length check of a variable length group
-                if (code.Length < rule.MinGroupLength)
+                validationErrorMessage = VariableLengthCheck(groupsList, code, groupsListAsSpan, rule);
+                if (validationErrorMessage != null)
                 {
-                    var errorPosition = str.Length - span.Length + 1;
-                    return $"Длина группы применения {rule.GroupCode} меньше указанной, ожидалось {rule.MinGroupLength}+, найдена {code.Length}. Позиция {errorPosition}.";
+                    return validationErrorMessage;
                 }
 
-                if (code.Length == 0 || indexOfSeparator == -1 && i == validationRules.Length - 1)
+                if (code.Length == 0 || indexOfSeparator == -1 && currentRuleNumber == validationRules.Length - 1)
                 {
-                    span = span.Slice(rule.GroupCode.Length);
+                    groupsListAsSpan = groupsListAsSpan.Slice(rule.GroupCode.Length);
                 }
                 else
                 {
-                    span = span.Slice(indexOfSeparator + VariableLengthCodeSeparator.Length);
+                    groupsListAsSpan = groupsListAsSpan.Slice(indexOfSeparator + VariableLengthCodeSeparator.Length);
                 }
 
-                if (i == validationRules.Length - 1 && indexOfSeparator != -1 && !span.IsEmpty)
+                validationErrorMessage = VariableCodeContinuationCheck(currentRuleNumber, indexOfSeparator, groupsList, groupsListAsSpan);
+                if (validationErrorMessage != null)
                 {
-                    var errorPosition = str.Length - span.Length + 1;
-                    return $"Код продолжается после завершающей группы применения, найдено {span}. Позиция {errorPosition}.";
+                    return validationErrorMessage;
                 }
+
+                continue;
+            }
+
+            if (groupsListAsSpan.Length < rule.GroupCode.Length + rule.MinGroupLength)
+            {
+                code = groupsListAsSpan.Slice(rule.GroupCode.Length);
             }
             else
             {
-                ReadOnlySpan<char> code;
-
-                if (span.Length < rule.GroupCode.Length + rule.MinGroupLength)
-                {
-                    code = span.Slice(rule.GroupCode.Length);
-                }
-                else
-                {
-                    code = span.Slice(rule.GroupCode.Length, rule.MinGroupLength);
-                }
-
-                //fixed length group check
-                if (code.Length != rule.MinGroupLength)
-                {
-                    var errorPosition = str.Length - span.Length + 1;
-                    return $"Группа применения {rule.GroupCode} переменной длины, ожидалось фиксированной {rule.MinGroupLength}. Позиция {errorPosition}.";
-                }
-
-                span = span.Slice(rule.GroupCode.Length + rule.MinGroupLength);
-
-                if (i == validationRules.Length - 1 && !span.IsEmpty && span.Length > rule.MinGroupLength)
-                {
-                    var errorPosition = str.Length - span.Length + VariableLengthCodeSeparator.Length + 1;
-                    return $"Код продолжается после завершающей группы применения, найдено {span.Slice(rule.MinGroupLength)}. Позиция {errorPosition}.";
-                }
+                code = groupsListAsSpan.Slice(rule.GroupCode.Length, rule.MinGroupLength);
             }
+
+            validationErrorMessage = FixedLengthCheck(groupsList, code, groupsListAsSpan, rule);
+            if (validationErrorMessage != null)
+            {
+                return validationErrorMessage;
+            }
+
+            groupsListAsSpan = groupsListAsSpan.Slice(rule.GroupCode.Length + rule.MinGroupLength);
+
+            validationErrorMessage = FixedCodeContinuationCheck(currentRuleNumber, groupsList, groupsListAsSpan, rule);
+            if (validationErrorMessage != null)
+            {
+                return validationErrorMessage;
+            }
+        }
+
+        return null;
+    }
+
+    private string GroupCheck(string groupsList, ReadOnlySpan<char> groupsListAsSpan, ValidationRule rule)
+    {
+        ReadOnlySpan<char> groupCode;
+
+        if (groupsListAsSpan.Length < rule.GroupCode.Length)
+        {
+            groupCode = groupsListAsSpan.Slice(0);
+        }
+        else
+        {
+            groupCode = groupsListAsSpan.Slice(0, rule.GroupCode.Length);
+        }
+
+        if (!MemoryExtensions.Equals(rule.GroupCode, groupCode, StringComparison.Ordinal))
+        {
+            if (groupCode.IsEmpty)
+            {
+                return $"Ожидалась группа применения {rule.GroupCode}, найдена <конец кода>." +
+                       $"Позиция {groupsList.Length + 1}.";
+            }
+            var errorPosition = groupsList.Length - groupsListAsSpan.Length + 1;
+
+            return $"Ожидалась группа применения {rule.GroupCode}, найдена {groupCode}. " +
+                   $"Позиция {errorPosition}.";
+        }
+
+        return null;
+    }
+
+    private string VariableLengthCheck(string groupsList, ReadOnlySpan<char> code, ReadOnlySpan<char> groupsListAsSpan, ValidationRule rule)
+    {
+        if (code.Length < rule.MinGroupLength)
+        {
+            var errorPosition = groupsList.Length - groupsListAsSpan.Length + 1;
+
+            return $"Длина группы применения {rule.GroupCode} меньше указанной, ожидалось {rule.MinGroupLength}+, найдена {code.Length}." +
+                   $"Позиция {errorPosition}.";
+        }
+
+        return null;
+    }
+
+    private string FixedLengthCheck(string groupsList, ReadOnlySpan<char> code, ReadOnlySpan<char> groupsListAsSpan, ValidationRule rule)
+    {
+        if (code.Length != rule.MinGroupLength)
+        {
+            var errorPosition = groupsList.Length - groupsListAsSpan.Length + 1;
+
+            return $"Группа применения {rule.GroupCode} переменной длины, ожидалось фиксированной {rule.MinGroupLength}." +
+                   $"Позиция {errorPosition}.";
+        }
+
+        return null;
+    }
+
+    private string VariableCodeContinuationCheck(int currentRuleNumber, int indexOfSeparator, string groupsList, ReadOnlySpan<char> groupsListAsSpan)
+    {
+        if (currentRuleNumber == validationRules.Length - 1 && indexOfSeparator != -1 && !groupsListAsSpan.IsEmpty)
+        {
+            var errorPosition = groupsList.Length - groupsListAsSpan.Length + 1;
+
+            return $"Код продолжается после завершающей группы применения, найдено {groupsListAsSpan}." +
+                   $"Позиция {errorPosition}.";
+        }
+
+        return null;
+    }
+
+    private string FixedCodeContinuationCheck(int currentRuleNumber, string groupsList, ReadOnlySpan<char> groupsListAsSpan, ValidationRule rule)
+    {
+        if (currentRuleNumber == validationRules.Length - 1 && !groupsListAsSpan.IsEmpty && groupsListAsSpan.Length > rule.MinGroupLength)
+        {
+            var errorPosition = groupsList.Length - groupsListAsSpan.Length + VariableLengthCodeSeparator.Length + 1;
+
+            return $"Код продолжается после завершающей группы применения, найдено {groupsListAsSpan.Slice(rule.MinGroupLength)}." +
+                   $"Позиция {errorPosition}.";
         }
 
         return null;
