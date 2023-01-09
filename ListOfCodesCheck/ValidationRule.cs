@@ -1,6 +1,6 @@
 ﻿namespace ListOfCodesCheck;
 
-public class GroupModel
+public class ValidationRule
 {
     public string GroupCode { get; set; }
     public int MinGroupLength { get; set; }

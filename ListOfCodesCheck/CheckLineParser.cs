@@ -1,14 +1,14 @@
 ﻿namespace ListOfCodesCheck;
 
-public class Parser
+public class CheckLineParser
 {
-    public GroupModel[] ParseCheckLine(string checkLine) => checkLine.Split(',', ';').Select(MapToModel).ToArray();
+    public ValidationRule[] Parse(string checkLine) => checkLine.Split(',', ';').Select(MapToModel).ToArray();
 
-    private GroupModel MapToModel(string parsedStr)
+    private ValidationRule MapToModel(string parsedStr)
     {
         var strings = parsedStr.Split("-");
 
-        var result = new GroupModel
+        var result = new ValidationRule
         {
             GroupCode = strings[0].Trim()
         };
