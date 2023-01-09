@@ -1,10 +1,7 @@
 ﻿using ListOfCodesCheck;
 
-//var filePath = args[0];
-//var checkLine = args[1];
-
-var filePath = "codes.txt";
-var checkLine = "1234 - 7, 123 - 5+; 12 - 3, 234 - 3+";
+var filePath = args[0];
+var checkLine = args[1];
 
 var file = File.ReadAllLines(filePath);
 using StreamWriter checkedFile = new("checkedCodes.txt", append: true);
