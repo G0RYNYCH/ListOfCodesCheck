@@ -33,8 +33,6 @@ public class Validator
             {
                 var indexOfSeparator = groupsListAsSpan.IndexOf(VariableLengthCodeSeparator);
 
-                
-
                 if (indexOfSeparator == -1)
                 {
                     code = groupsListAsSpan.Slice(rule.GroupCode.Length);
