@@ -35,7 +35,11 @@ public class Validator
             //group check
             if (!MemoryExtensions.Equals(rule.GroupCode, groupCode, StringComparison.Ordinal))
             {
-                var errorPosition = str.IndexOf(span.ToString()) + 1;
+                var errorPosition = str.Length - span.Length + 1;
+                if (groupCode.IsEmpty)
+                {
+                    return $"Ожидалась группа применения {rule.GroupCode}, найдена <конец кода>. Позиция {str.Length + 1}.";
+                }
                 return $"Ожидалась группа применения {rule.GroupCode}, найдена {groupCode}. Позиция {errorPosition}.";
             }
 
@@ -64,17 +68,23 @@ public class Validator
                 //length check of a variable length group
                 if (code.Length < rule.MinGroupLength)
                 {
-                    var errorPosition = str.IndexOf(span.ToString()) + 1;
+                    var errorPosition = str.Length - span.Length + 1;
                     return $"Длина группы применения {rule.GroupCode} меньше указанной, ожидалось {rule.MinGroupLength}+, найдена {code.Length}. Позиция {errorPosition}.";
                 }
 
-                if (code.Length == 0)
+                if (code.Length == 0 || indexOfSeparator == -1 && i == validationRules.Length - 1)
                 {
                     span = span.Slice(rule.GroupCode.Length);
                 }
                 else
                 {
                     span = span.Slice(indexOfSeparator + VariableLengthCodeSeparator.Length);
+                }
+
+                if (i == validationRules.Length - 1 && indexOfSeparator != -1 && !span.IsEmpty)
+                {
+                    var errorPosition = str.Length - span.Length + 1;
+                    return $"Код продолжается после завершающей группы применения, найдено {span}. Позиция {errorPosition}.";
                 }
             }
             else
@@ -93,11 +103,17 @@ public class Validator
                 //fixed length group check
                 if (code.Length != rule.MinGroupLength)
                 {
-                    var errorPosition = str.IndexOf(span.ToString()) + 1;
+                    var errorPosition = str.Length - span.Length + 1;
                     return $"Группа применения {rule.GroupCode} переменной длины, ожидалось фиксированной {rule.MinGroupLength}. Позиция {errorPosition}.";
                 }
 
                 span = span.Slice(rule.GroupCode.Length + rule.MinGroupLength);
+
+                if (i == validationRules.Length - 1 && !span.IsEmpty && span.Length > rule.MinGroupLength)
+                {
+                    var errorPosition = str.Length - span.Length + VariableLengthCodeSeparator.Length + 1;
+                    return $"Код продолжается после завершающей группы применения, найдено {span.Slice(rule.MinGroupLength)}. Позиция {errorPosition}.";
+                }
             }
         }
 
