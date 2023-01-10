@@ -71,7 +71,7 @@ public class Validator
 
             groupsListAsSpan = groupsListAsSpan.Slice(rule.GroupCode.Length + rule.MinGroupLength);
 
-            errorMessage = ValidateFixedCodeContinuation(currentRuleNumber, groupsList, groupsListAsSpan, rule);
+            errorMessage = ValidateFixedCodeContinuation(currentRuleNumber, groupsList, groupsListAsSpan);
             if (errorMessage != null)
             {
                 return errorMessage;
@@ -98,7 +98,7 @@ public class Validator
         {
             if (groupCode.IsEmpty)
             {
-                return $"Ожидалась группа применения {rule.GroupCode}, найдена <конец кода>." +
+                return $"Ожидалась группа применения {rule.GroupCode}, найдена <конец кода>. " +
                        $"Позиция {groupsList.Length + 1}.";
             }
             var errorPosition = groupsList.Length - groupsListAsSpan.Length + 1;
@@ -124,7 +124,7 @@ public class Validator
         {
             var errorPosition = groupsList.Length - groupsListAsSpan.Length + 1;
 
-            return $"Длина группы применения {rule.GroupCode} меньше указанной, ожидалось {rule.MinGroupLength}+, найдена {code.Length}." +
+            return $"Длина группы применения {rule.GroupCode} меньше указанной, ожидалось {rule.MinGroupLength}+, найдена {code.Length}. " +
                    $"Позиция {errorPosition}.";
         }
 
@@ -145,7 +145,7 @@ public class Validator
         {
             var errorPosition = groupsList.Length - groupsListAsSpan.Length + 1;
 
-            return $"Группа применения {rule.GroupCode} переменной длины, ожидалось фиксированной {rule.MinGroupLength}." +
+            return $"Группа применения {rule.GroupCode} переменной длины, ожидалось фиксированной {rule.MinGroupLength}. " +
                    $"Позиция {errorPosition}.";
         }
 
@@ -166,7 +166,7 @@ public class Validator
         {
             var errorPosition = groupsList.Length - groupsListAsSpan.Length + 1;
 
-            return $"Код продолжается после завершающей группы применения, найдено {groupsListAsSpan}." +
+            return $"Код продолжается после завершающей группы применения, найдено {groupsListAsSpan}. " +
                    $"Позиция {errorPosition}.";
         }
 
@@ -181,13 +181,13 @@ public class Validator
     /// <param name="groupsListAsSpan">Line of groups converted to span.</param>
     /// <param name="rule">Current rule for validating.</param>
     /// <returns>Null if validation is OK otherwise error message with unexpected part of the code.</returns>
-    private string ValidateFixedCodeContinuation(int currentRuleNumber, string groupsList, ReadOnlySpan<char> groupsListAsSpan, ValidationRule rule)
+    private string ValidateFixedCodeContinuation(int currentRuleNumber, string groupsList, ReadOnlySpan<char> groupsListAsSpan)
     {
-        if (currentRuleNumber == _validationRules.Length - 1 && !groupsListAsSpan.IsEmpty && groupsListAsSpan.Length > rule.MinGroupLength)
+        if (currentRuleNumber == _validationRules.Length - 1 && !groupsListAsSpan.IsEmpty)
         {
-            var errorPosition = groupsList.Length - groupsListAsSpan.Length + VariableLengthCodeSeparator.Length + 1;
+            var errorPosition = groupsList.Length - groupsListAsSpan.Length + 1;
 
-            return $"Код продолжается после завершающей группы применения, найдено {groupsListAsSpan.Slice(rule.MinGroupLength)}." +
+            return $"Код продолжается после завершающей группы применения, найдено {groupsListAsSpan}. " +
                    $"Позиция {errorPosition}.";
         }
 
