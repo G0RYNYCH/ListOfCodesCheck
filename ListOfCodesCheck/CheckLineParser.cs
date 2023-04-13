@@ -16,6 +16,7 @@ public class CheckLineParser
         if (strings.Length == 1)
         {
             result.IsLengthVariable = true;
+
             return result;
         }
 

@@ -26,9 +26,7 @@ public class Validator
 
             var errorMessage = ValidateGroup(groupsList, groupsListAsSpan, rule);
             if (errorMessage != null)
-            {
                 return errorMessage;
-            }
 
             ReadOnlySpan<char> code;
 
@@ -42,9 +40,7 @@ public class Validator
 
                 errorMessage = ValidateVariableLength(groupsList, code, groupsListAsSpan, rule);
                 if (errorMessage != null)
-                {
                     return errorMessage;
-                }
 
                 groupsListAsSpan = code.Length == 0 || indexOfSeparator == -1 && currentRuleNumber == _validationRules.Length - 1
                     ? groupsListAsSpan.Slice(rule.GroupCode.Length)
@@ -52,9 +48,7 @@ public class Validator
 
                 errorMessage = ValidateVariableCodeContinuation(currentRuleNumber, indexOfSeparator, groupsList, groupsListAsSpan);
                 if (errorMessage != null)
-                {
                     return errorMessage;
-                }
 
                 continue;
             }
@@ -65,17 +59,13 @@ public class Validator
 
             errorMessage = ValidateFixedLength(groupsList, code, groupsListAsSpan, rule);
             if (errorMessage != null)
-            {
                 return errorMessage;
-            }
 
             groupsListAsSpan = groupsListAsSpan.Slice(rule.GroupCode.Length + rule.MinGroupLength);
 
             errorMessage = ValidateFixedCodeContinuation(currentRuleNumber, groupsList, groupsListAsSpan);
             if (errorMessage != null)
-            {
                 return errorMessage;
-            }
         }
 
         return null;
@@ -97,10 +87,9 @@ public class Validator
         if (!MemoryExtensions.Equals(rule.GroupCode, groupCode, StringComparison.Ordinal))
         {
             if (groupCode.IsEmpty)
-            {
                 return $"Ожидалась группа применения {rule.GroupCode}, найдена <конец кода>. " +
                        $"Позиция {groupsList.Length + 1}.";
-            }
+
             var errorPosition = groupsList.Length - groupsListAsSpan.Length + 1;
 
             return $"Ожидалась группа применения {rule.GroupCode}, найдена {groupCode}. " +

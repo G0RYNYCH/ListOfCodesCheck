@@ -14,11 +14,7 @@ foreach (var groupsList in file)
     var errorMessage = validator.Validate(groupsList);
 
     if (errorMessage == null)
-    {
         checkedFile.WriteLine(groupsList + "\t OK");
-    }
     else
-    {
         checkedFile.WriteLine(groupsList + $"\t {errorMessage}");
-    }
 }
